@@ -1,6 +1,6 @@
 use crate::{
-    cmp, rand_norm, unit_vector, write_clr, Color3, HitRecord, Hittable, Interval, Point3, Ray,
-    Vec3, INFINTY,
+    cmp, rand_norm, rand_outside, rand_unit_vector, unit_vector, write_clr, Color3, HitRecord,
+    Hittable, Interval, Point3, Ray, Vec3, INFINTY,
 };
 
 pub struct Camera {
@@ -13,21 +13,20 @@ pub struct Camera {
     pixelDeltav: Vec3,
     samplesPerPixel: u64,
     pixelSamplesScale: f64,
+    maxDepth: u32,
 }
 
 impl Camera {
     pub fn render(&self, world: &mut (impl Hittable)) {
         print!("P3\n{} {}\n255\n", self.w, self.h);
         for i in 0..self.h {
+            eprintln!("REMAINING LINES === {}", self.h - i);
             for j in 0..self.w {
-                // let pixelCenter =
-                //     self.pixel00 + (j as f64 * self.pixelDeltau) + (i as f64 * self.pixelDeltav);
-                // let rayDir = pixelCenter - self.center;
-                // let r = Ray::from(self.center, rayDir);
+                // eprintln!("   REMAINING PIX === {}", self.w - j);
                 let mut clr = Color3::new();
                 for s in 0..self.samplesPerPixel {
                     let r = self.get_ray(i, j);
-                    let pixelClr: Color3 = self.ray_color(r, world);
+                    let pixelClr: Color3 = self.ray_color(r, self.maxDepth, world);
                     clr += pixelClr;
                 }
                 write_clr(clr * self.pixelSamplesScale, false);
@@ -44,7 +43,7 @@ impl Camera {
         return Ray::from(self.center, rayDir);
     }
 
-    pub fn new(aspect_ratio: f64, w: u64, samplesPerPixel: u64) -> Camera {
+    pub fn new(aspect_ratio: f64, w: u64, samplesPerPixel: u64, maxDepth: u32) -> Camera {
         let h = cmp::max((w as f64 / aspect_ratio) as u64, 1);
 
         let focalLength = 1.0;
@@ -67,13 +66,18 @@ impl Camera {
             pixelDeltav,
             samplesPerPixel,
             pixelSamplesScale: 1.0 / (samplesPerPixel as f64),
+            maxDepth,
         }
     }
 
-    pub fn ray_color(&self, r: Ray, world: &mut impl Hittable) -> Color3 {
+    pub fn ray_color(&self, r: Ray, depth: u32, world: &mut impl Hittable) -> Color3 {
+        if depth <= 0 {
+            return Color3::new();
+        }
         let mut rec = HitRecord::new();
-        if world.hit(r, Interval::from(0.0, INFINTY), &mut rec) {
-            return 0.5 * (rec.normal + Color3::from(1.0, 1.0, 1.0));
+        if world.hit(r, Interval::from(0.001, INFINTY), &mut rec) {
+            let dir = rec.normal + rand_unit_vector();
+            return 0.5 * self.ray_color(Ray::from(rec.p, dir), depth - 1, world);
         }
         let uDir: Vec3 = unit_vector(r.direction());
         let a = 0.5 * (uDir.y() + 1.0);
