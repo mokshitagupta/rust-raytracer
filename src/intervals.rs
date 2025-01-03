@@ -29,6 +29,16 @@ impl Interval {
     pub fn surrounds(&self, x: f64) -> bool {
         self.min < x && self.max > x
     }
+
+    pub fn clamp(&self, x: f64) -> f64 {
+        if self.min > x {
+            return self.min;
+        }
+        if self.max < x {
+            return self.max;
+        }
+        return x;
+    }
 }
 
 pub const EMPTY: Interval = Interval::from(INFINTY, -INFINTY);

@@ -154,7 +154,7 @@ fn generate_img(w: u64) {
         100.0,
     ))));
 
-    let camera = Camera::new(aspectRatio, w);
+    let camera = Camera::new(aspectRatio, w, 100);
     camera.render(&mut world);
 }
 
