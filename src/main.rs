@@ -1,10 +1,17 @@
 use core::f64;
 // use std::borrow::BorrowMut;
 use std::cell::RefCell;
+use std::cmp;
 use std::rc::Rc;
-use std::{cmp, fs::File, io::Write};
+mod camera;
+use camera::*;
 mod color;
+mod intervals;
+use intervals::*;
+mod utils;
 use color::*;
+use intervals::Interval;
+use utils::*;
 mod ray;
 use ray::*;
 mod vec3;
@@ -45,7 +52,7 @@ impl HitRecord {
 }
 
 pub trait Hittable {
-    fn hit(&mut self, r: Ray, tmin: f64, tmax: f64, rec: &mut HitRecord) -> bool;
+    fn hit(&mut self, r: Ray, ray_root: Interval, rec: &mut HitRecord) -> bool;
 }
 
 pub struct Sphere {
@@ -54,8 +61,7 @@ pub struct Sphere {
 }
 
 impl Hittable for Sphere {
-    fn hit(&mut self, r: Ray, tmin: f64, tmax: f64, rec: &mut HitRecord) -> bool {
-        let uDir: Vec3 = unit_vector(r.direction());
+    fn hit(&mut self, r: Ray, ray_root: Interval, rec: &mut HitRecord) -> bool {
         // let center = Vec3::from(0.0, 0.0, -1.0);
         let cmq = self.center - r.origin();
         let ai = r.direction().length_squared();
@@ -72,9 +78,9 @@ impl Hittable for Sphere {
         } else {
             let sqrtd = det_in.sqrt();
             let mut quad_form = (h - sqrtd) / (ai);
-            if quad_form <= tmin || quad_form >= tmax {
+            if !ray_root.surrounds(quad_form) {
                 quad_form = (h + sqrtd) / (ai);
-                if quad_form <= tmin || quad_form >= tmax {
+                if !ray_root.surrounds(quad_form) {
                     return false;
                 }
             }
@@ -102,13 +108,15 @@ pub struct HittableList {
 }
 
 impl Hittable for HittableList {
-    fn hit(&mut self, r: Ray, tmin: f64, tmax: f64, rec: &mut HitRecord) -> bool {
+    fn hit(&mut self, r: Ray, ray_root: Interval, rec: &mut HitRecord) -> bool {
         let mut temp_rec = HitRecord::new();
         let mut hit_any = false;
-        let mut closest = tmax;
+        let mut closest = ray_root.max;
 
         for i in self.objects.iter() {
-            if i.borrow_mut().hit(r, tmin, closest, &mut temp_rec) {
+            if i.borrow_mut()
+                .hit(r, Interval::from(ray_root.min, closest), &mut temp_rec)
+            {
                 hit_any = true;
                 closest = temp_rec.t;
                 rec.copy(&temp_rec);
@@ -144,31 +152,12 @@ impl HittableList {
 
 fn ray_color(r: Ray, world: &mut (impl Hittable + List)) -> Color3 {
     let mut rec = HitRecord::new();
-    if world.hit(r, 0.0, f64::INFINITY, &mut rec) {
+    if world.hit(r, Interval::from(0.0, INFINTY), &mut rec) {
         return 0.5 * (rec.normal + Color3::from(1.0, 1.0, 1.0));
     }
     let uDir: Vec3 = unit_vector(r.direction());
     let a = 0.5 * (uDir.y() + 1.0);
     return (1.0 - a) * Color3::from(1.0, 1.0, 1.0) + a * Color3::from(0.5, 0.7, 1.0);
-
-    // let center = Vec3::from(0.0, 0.0, -1.0);
-    // let cmq = center - r.origin();
-    // let ai = uDir.length_squared();
-    // let b = dot(-2.0 * uDir, cmq);
-    // let radius = 0.5;
-    // let c = dot(cmq, cmq) - (radius * radius);
-    // //(b^2 - 4ac ) <- sqrt
-    // let det_in = (b * b) - (4.0 * ai * c);
-
-    // // println!("{uDir:?} {r:?}");
-    // if det_in < 0.0 {
-    //     return clr;
-    // } else {
-    //     let quad_form = (-b - det_in.sqrt()) / (2.0 * ai);
-    //     let p = r.origin() + (quad_form * r.direction());
-    //     let N = unit_vector(p - center);
-    //     return 0.5 * Color3::from(N.x() + 1.0, N.y() + 1.0, N.z() + 1.0);
-    // };
 }
 
 fn generate_img(w: u64) {
@@ -185,27 +174,8 @@ fn generate_img(w: u64) {
         100.0,
     ))));
 
-    let focalLength = 1.0;
-    let vpHeight = 2.0;
-    let vpWidth = vpHeight * (w as f64 / h as f64);
-    let camCenter: Point3 = Point3::new();
-    let vpu = Vec3::from(vpWidth, 0.0, 0.0);
-    let vpv = Vec3::from(0.0, -vpHeight, 0.0);
-    let pixelDeltau = vpu / (w as f64);
-    let pixelDeltav = vpv / (h as f64);
-
-    let vpUpperLeft = camCenter - Vec3::from(0.0, 0.0, focalLength) - (vpu / 2.0) - (vpv / 2.0);
-    let pixel00 = vpUpperLeft + 0.5 * (pixelDeltau + pixelDeltav);
-    print!("P3\n{w} {h}\n255\n");
-    for i in 0..h {
-        for j in 0..w {
-            let pixelCenter = pixel00 + (j as f64 * pixelDeltau) + (i as f64 * pixelDeltav);
-            let rayDir = pixelCenter - camCenter;
-            let r = Ray::from(camCenter, rayDir);
-            let pixelClr: Color3 = ray_color(r, &mut world);
-            write_clr(pixelClr, false);
-        }
-    }
+    let camera = Camera::new(aspectRatio, w);
+    camera.render(&mut world);
 }
 
 fn main() {
