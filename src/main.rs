@@ -8,9 +8,25 @@ use vec3::*;
 
 fn ray_color(r: Ray) -> Color3 {
     let uDir: Vec3 = unit_vector(r.direction());
+    let center = Vec3::from(0.0, 0.0, -1.0);
+    let cmq = center - r.origin();
+    let ai = dot(uDir, uDir);
+    let b = dot(-2.0 * uDir, cmq);
+    let radius = 0.5;
+    let c = dot(cmq, cmq) - (radius * radius);
+    //(b^2 - 4ac ) <- sqrt
+    let det_in = (b * b) - (4.0 * ai * c);
+
+    // let normal = r.direction() - center;
+
     // println!("{uDir:?} {r:?}");
     let a = 0.5 * (uDir.y() + 1.0);
-    return (1.0 - a) * Color3::from(1.0, 1.0, 1.0) + a * Color3::from(0.5, 0.7, 1.0);
+    let clr = (1.0 - a) * Color3::from(1.0, 1.0, 1.0) + a * Color3::from(0.5, 0.7, 1.0);
+    if det_in < 0.0 {
+        return clr;
+    } else {
+        return Color3::from(1.0, 0.0, 0.0);
+    };
 }
 
 fn generate_img(w: u64) {
