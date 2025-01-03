@@ -62,17 +62,12 @@ pub struct Sphere {
 
 impl Hittable for Sphere {
     fn hit(&mut self, r: Ray, ray_root: Interval, rec: &mut HitRecord) -> bool {
-        // let center = Vec3::from(0.0, 0.0, -1.0);
         let cmq = self.center - r.origin();
         let ai = r.direction().length_squared();
         let h = dot(r.direction(), cmq);
-        // let b = dot(-2.0 * uDir, cmq);
-        // let radius = 0.5;
         let c = cmq.length_squared() - (self.radius * self.radius);
-        //(b^2 - 4ac ) <- sqrt
         let det_in = (h * h) - (ai * c);
 
-        // println!("{uDir:?} {r:?}");
         if det_in < 0.0 {
             return false;
         } else {
@@ -89,10 +84,7 @@ impl Hittable for Sphere {
             rec.p = r.at(rec.t);
             let out_norm = (rec.p - self.center) / self.radius;
             rec.set_face_normal(r, out_norm);
-            // let p = r.origin() + (quad_form * r.direction());
             return true;
-            // let N = unit_vector(p - self.center);
-            // return 0.5 * Color3::from(N.x() + 1.0, N.y() + 1.0, N.z() + 1.0);
         };
     }
 }
@@ -150,20 +142,8 @@ impl HittableList {
     }
 }
 
-fn ray_color(r: Ray, world: &mut (impl Hittable + List)) -> Color3 {
-    let mut rec = HitRecord::new();
-    if world.hit(r, Interval::from(0.0, INFINTY), &mut rec) {
-        return 0.5 * (rec.normal + Color3::from(1.0, 1.0, 1.0));
-    }
-    let uDir: Vec3 = unit_vector(r.direction());
-    let a = 0.5 * (uDir.y() + 1.0);
-    return (1.0 - a) * Color3::from(1.0, 1.0, 1.0) + a * Color3::from(0.5, 0.7, 1.0);
-}
-
 fn generate_img(w: u64) {
     let aspectRatio: f64 = 16.0 / 9.0;
-    let h = cmp::max((w as f64 / aspectRatio) as u64, 1);
-
     let mut world = HittableList::new();
     world.add(Rc::new(RefCell::new(Sphere::new(
         Point3::from(0.0, 0.0, -1.0),
