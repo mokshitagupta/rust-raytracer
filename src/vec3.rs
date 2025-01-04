@@ -36,9 +36,21 @@ impl Vec3 {
         self.e[0] * self.e[0] + self.e[1] * self.e[1] + self.e[2] * self.e[2]
     }
 
+    pub fn copy(&mut self, v: Vec3) {
+        self.e[0] = v.x();
+        self.e[1] = v.y();
+        self.e[2] = v.z();
+    }
+
+    pub fn near_zero(&self) -> bool {
+        let s: f64 = 1e-8;
+        (self.e[0].abs() < s) && (self.e[1].abs() < s) && (self.e[2].abs() < s)
+    }
+
     pub fn rand_norm() -> Vec3 {
         Vec3::from(rand_norm(), rand_norm(), rand_norm())
     }
+
     pub fn rand_from(min: f64, max: f64) -> Vec3 {
         Vec3::from(
             rand_from(min, max),
@@ -203,4 +215,9 @@ pub fn rand_outside(norm: Vec3) -> Vec3 {
     } else {
         return -on_sphere;
     }
+}
+
+#[inline(always)]
+pub fn reflect(v: Vec3, n: Vec3) -> Vec3 {
+    v - (2.0 * dot(n, v) * n)
 }

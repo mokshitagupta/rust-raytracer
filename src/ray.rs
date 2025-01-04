@@ -14,6 +14,11 @@ impl Ray {
         }
     }
 
+    pub fn set(&mut self, orig: Point3, dir: Vec3) {
+        self.orig = orig;
+        self.direction = dir;
+    }
+
     pub fn at(&self, t: f64) -> Point3 {
         self.orig + t * self.direction
     }

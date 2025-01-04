@@ -1,4 +1,5 @@
 use core::f64;
+// use std::borrow::Borrow;
 // use std::borrow::BorrowMut;
 use std::cell::RefCell;
 use std::cmp;
@@ -17,11 +18,13 @@ use ray::*;
 mod vec3;
 use vec3::*;
 
+#[derive(Clone)]
 pub struct HitRecord {
     p: Point3,
     normal: Vec3,
     t: f64,
     front_face: bool,
+    mat: Rc<RefCell<dyn Material>>,
 }
 
 impl HitRecord {
@@ -40,6 +43,7 @@ impl HitRecord {
             normal: Vec3::new(),
             t: 0.0,
             front_face: false,
+            mat: Rc::new(RefCell::new(Lambertian::from(Color3::new()))),
         }
     }
 
@@ -48,6 +52,7 @@ impl HitRecord {
         self.front_face = rec.front_face;
         self.normal = rec.normal;
         self.t = rec.t;
+        self.mat = rec.mat.clone();
     }
 }
 
@@ -55,9 +60,76 @@ pub trait Hittable {
     fn hit(&mut self, r: Ray, ray_root: Interval, rec: &mut HitRecord) -> bool;
 }
 
+pub trait Material {
+    fn scatter(
+        &mut self,
+        r_in: Ray,
+        rec: &mut HitRecord,
+        attenuation: &mut Color3,
+        scattered: &mut Ray,
+    ) -> bool;
+}
+
+#[derive(Debug)]
+pub struct Lambertian {
+    albedo: Color3,
+}
+
+#[derive(Debug)]
+pub struct Metal {
+    albedo: Color3,
+}
+
+impl Material for Lambertian {
+    fn scatter(
+        &mut self,
+        r_in: Ray,
+        rec: &mut HitRecord,
+        attenuation: &mut Color3,
+        scattered: &mut Ray,
+    ) -> bool {
+        let mut dir = rec.normal + rand_unit_vector();
+        if dir.near_zero() {
+            dir = rec.normal;
+        }
+        scattered.set(rec.p, dir);
+        attenuation.copy(self.albedo);
+        // eprintln!("{attenuation:?} {:?}", self.albedo);
+        true
+    }
+}
+
+impl Material for Metal {
+    fn scatter(
+        &mut self,
+        r_in: Ray,
+        rec: &mut HitRecord,
+        attenuation: &mut Color3,
+        scattered: &mut Ray,
+    ) -> bool {
+        let reflected = reflect(r_in.direction(), rec.normal);
+        scattered.set(rec.p, reflected);
+        attenuation.copy(self.albedo);
+        true
+    }
+}
+
+impl Metal {
+    fn from(albedo: Color3) -> impl Material {
+        Metal { albedo }
+    }
+}
+
+impl Lambertian {
+    fn from(albedo: Color3) -> impl Material {
+        Lambertian { albedo }
+    }
+}
+
 pub struct Sphere {
     center: Point3,
     radius: f64,
+    mat: Rc<RefCell<dyn Material>>,
 }
 
 impl Hittable for Sphere {
@@ -84,14 +156,19 @@ impl Hittable for Sphere {
             rec.p = r.at(rec.t);
             let out_norm = (rec.p - self.center) / self.radius;
             rec.set_face_normal(r, out_norm);
+            rec.mat = self.mat.clone();
             return true;
         };
     }
 }
 
 impl Sphere {
-    pub fn new(center: Point3, radius: f64) -> impl Hittable {
-        Sphere { center, radius }
+    pub fn new(center: Point3, radius: f64, mat: Rc<RefCell<dyn Material>>) -> impl Hittable {
+        Sphere {
+            center,
+            radius,
+            mat,
+        }
     }
 }
 
@@ -145,13 +222,34 @@ impl HittableList {
 fn generate_img(w: u64) {
     let aspectRatio: f64 = 16.0 / 9.0;
     let mut world = HittableList::new();
-    world.add(Rc::new(RefCell::new(Sphere::new(
-        Point3::from(0.0, 0.0, -1.0),
-        0.5,
-    ))));
+
+    let ground_mat = Rc::new(RefCell::new(Lambertian::from(Color3::from(0.8, 0.8, 0.0))));
+    let center_mat = Rc::new(RefCell::new(Lambertian::from(Color3::from(0.1, 0.2, 0.5))));
+    let left_mat = Rc::new(RefCell::new(Metal::from(Color3::from(0.8, 0.8, 0.8))));
+    let right_mat = Rc::new(RefCell::new(Metal::from(Color3::from(0.8, 0.6, 0.2))));
+    // eprintln!("{:?}", *ground_mat.borrow());
+
     world.add(Rc::new(RefCell::new(Sphere::new(
         Point3::from(0.0, -100.5, -1.0),
         100.0,
+        ground_mat,
+    ))));
+    world.add(Rc::new(RefCell::new(Sphere::new(
+        Point3::from(0.0, 0.0, -1.2),
+        0.5,
+        center_mat,
+    ))));
+
+    world.add(Rc::new(RefCell::new(Sphere::new(
+        Point3::from(-1.0, 0.0, -1.0),
+        0.5,
+        left_mat,
+    ))));
+
+    world.add(Rc::new(RefCell::new(Sphere::new(
+        Point3::from(1.0, 0.0, -1.0),
+        0.5,
+        right_mat,
     ))));
 
     let camera = Camera::new(aspectRatio, w, 100, 50);
