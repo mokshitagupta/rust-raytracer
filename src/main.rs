@@ -96,8 +96,17 @@ impl Material for Diaelectric {
         if rec.front_face {
             rind = 1.0 / self.refractive_index;
         }
-        let refracted = refract(rind, unit_vector(r_in.direction()), rec.normal);
-        scattered.set(rec.p, refracted);
+
+        let cos_theta = dot(-unit_vector(r_in.direction()), rec.normal).min(1.0);
+        let sin_theta = (1.0 - cos_theta.powi(2)).sqrt();
+        let scatter;
+        if rind * sin_theta > 1.0 || (Diaelectric::reflectance(cos_theta, rind) > rand_norm()) {
+            // reflect
+            scatter = reflect(unit_vector(r_in.direction()), rec.normal);
+        } else {
+            scatter = refract(rind, unit_vector(r_in.direction()), rec.normal);
+        }
+        scattered.set(rec.p, scatter);
         attenuation.set(1.0, 1.0, 1.0);
         true
     }
@@ -108,6 +117,12 @@ impl Diaelectric {
         Diaelectric {
             refractive_index: ind,
         }
+    }
+
+    pub fn reflectance(cosine: f64, n1: f64) -> f64 {
+        let mut r0 = (1.0 - n1) / (1.0 + n1);
+        r0 *= r0;
+        r0 + ((1.0 - r0) * (1.0 - cosine).powi(5))
     }
 }
 
@@ -262,6 +277,7 @@ fn generate_img(w: u64) {
     let center_mat = Rc::new(RefCell::new(Lambertian::from(Color3::from(0.1, 0.2, 0.5))));
     // let left_mat = Rc::new(RefCell::new(Metal::from(Color3::from(0.8, 0.8, 0.8), 0.3)));
     let left_mat = Rc::new(RefCell::new(Diaelectric::from(1.50)));
+    let bubble_mat = Rc::new(RefCell::new(Diaelectric::from(1.00 / 1.50)));
     let right_mat = Rc::new(RefCell::new(Metal::from(Color3::from(0.8, 0.6, 0.2), 1.0)));
     // eprintln!("{:?}", *ground_mat.borrow());
 
@@ -280,6 +296,12 @@ fn generate_img(w: u64) {
         Point3::from(-1.0, 0.0, -1.0),
         0.5,
         left_mat,
+    ))));
+
+    world.add(Rc::new(RefCell::new(Sphere::new(
+        Point3::from(-1.0, 0.0, -1.0),
+        0.4,
+        bubble_mat,
     ))));
 
     world.add(Rc::new(RefCell::new(Sphere::new(
