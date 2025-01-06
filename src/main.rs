@@ -269,17 +269,13 @@ impl HittableList {
     }
 }
 
-fn generate_img(w: u64) {
-    let aspectRatio: f64 = 16.0 / 9.0;
-    let mut world = HittableList::new();
-
+fn create3Scene(world: &mut (impl Hittable + List)) {
     let ground_mat = Rc::new(RefCell::new(Lambertian::from(Color3::from(0.8, 0.8, 0.0))));
     let center_mat = Rc::new(RefCell::new(Lambertian::from(Color3::from(0.1, 0.2, 0.5))));
     // let left_mat = Rc::new(RefCell::new(Metal::from(Color3::from(0.8, 0.8, 0.8), 0.3)));
     let left_mat = Rc::new(RefCell::new(Diaelectric::from(1.50)));
     let bubble_mat = Rc::new(RefCell::new(Diaelectric::from(1.00 / 1.50)));
     let right_mat = Rc::new(RefCell::new(Metal::from(Color3::from(0.8, 0.6, 0.2), 1.0)));
-    // eprintln!("{:?}", *ground_mat.borrow());
 
     world.add(Rc::new(RefCell::new(Sphere::new(
         Point3::from(0.0, -100.5, -1.0),
@@ -309,8 +305,34 @@ fn generate_img(w: u64) {
         0.5,
         right_mat,
     ))));
+}
 
-    let camera = Camera::new(aspectRatio, w, 100, 50);
+fn createFOVScene(world: &mut (impl Hittable + List)) {
+    let r = f64::cos(PI / 4.0);
+    let ground_mat = Rc::new(RefCell::new(Lambertian::from(Color3::from(1.0, 0.0, 0.0))));
+    let center_mat = Rc::new(RefCell::new(Lambertian::from(Color3::from(0.0, 1.0, 0.0))));
+    world.add(Rc::new(RefCell::new(Sphere::new(
+        Point3::from(-r, 0.0, -1.0),
+        r,
+        ground_mat,
+    ))));
+    world.add(Rc::new(RefCell::new(Sphere::new(
+        Point3::from(r, 0.0, -1.0),
+        r,
+        center_mat,
+    ))));
+}
+
+fn generate_img(w: u64) {
+    let aspectRatio: f64 = 16.0 / 9.0;
+    let mut world = HittableList::new();
+    let fov = 50.0;
+    let lookfrom = Vec3::from(-2.0, 2.0, 1.0);
+    let lookat = Vec3::from(0.0, 0.0, -1.0);
+    let vup = Vec3::from(0.0, 1.0, 0.0);
+    create3Scene(&mut world);
+    // createFOVScene(&mut world);
+    let camera = Camera::new(aspectRatio, w, 100, 50, fov, lookfrom, lookat, vup);
     camera.render(&mut world);
 }
 

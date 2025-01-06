@@ -1,6 +1,6 @@
 use crate::{
-    cmp, rand_norm, rand_outside, rand_unit_vector, unit_vector, write_clr, Color3, HitRecord,
-    Hittable, Interval, Point3, Ray, Vec3, INFINTY,
+    cmp, cross, deg2rad, rand_norm, rand_outside, rand_unit_vector, unit_vector, write_clr, Color3,
+    HitRecord, Hittable, Interval, Point3, Ray, Vec3, INFINTY,
 };
 
 pub struct Camera {
@@ -14,6 +14,10 @@ pub struct Camera {
     samplesPerPixel: u64,
     pixelSamplesScale: f64,
     maxDepth: u32,
+    fov: f64,
+    w_a: Vec3,
+    u_a: Vec3,
+    v_a: Vec3,
 }
 
 impl Camera {
@@ -43,18 +47,32 @@ impl Camera {
         return Ray::from(self.center, rayDir);
     }
 
-    pub fn new(aspect_ratio: f64, w: u64, samplesPerPixel: u64, maxDepth: u32) -> Camera {
+    pub fn new(
+        aspect_ratio: f64,
+        w: u64,
+        samplesPerPixel: u64,
+        maxDepth: u32,
+        fov: f64,
+        lookfrom: Point3,
+        lookat: Point3,
+        vup: Vec3,
+    ) -> Camera {
         let h = cmp::max((w as f64 / aspect_ratio) as u64, 1);
 
-        let focalLength = 1.0;
-        let vpHeight = 2.0;
+        let camCenter: Point3 = lookfrom;
+        let focalLength = (lookfrom - lookat).length();
+        let w_a = unit_vector(lookfrom - lookat);
+        let u_a = unit_vector(cross(vup, w_a));
+        let v_a = cross(w_a, u_a);
+        let fov_angle = f64::tan(deg2rad(fov / 2.0));
+        let vpHeight = 2.0 * focalLength * fov_angle;
         let vpWidth = vpHeight * (w as f64 / h as f64);
-        let camCenter: Point3 = Point3::new();
-        let vpu = Vec3::from(vpWidth, 0.0, 0.0);
-        let vpv = Vec3::from(0.0, -vpHeight, 0.0);
+        let vpu = vpWidth * u_a;
+        let vpv = vpHeight * (-v_a);
+
         let pixelDeltau = vpu / (w as f64);
         let pixelDeltav = vpv / (h as f64);
-        let vpUpperLeft = camCenter - Vec3::from(0.0, 0.0, focalLength) - (vpu / 2.0) - (vpv / 2.0);
+        let vpUpperLeft = camCenter - (focalLength * w_a) - (vpu / 2.0) - (vpv / 2.0);
         let pixel00 = vpUpperLeft + 0.5 * (pixelDeltau + pixelDeltav);
         Camera {
             aspect_ratio,
@@ -67,6 +85,10 @@ impl Camera {
             samplesPerPixel,
             pixelSamplesScale: 1.0 / (samplesPerPixel as f64),
             maxDepth,
+            fov,
+            w_a,
+            u_a,
+            v_a,
         }
     }
 
