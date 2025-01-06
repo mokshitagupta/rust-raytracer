@@ -11,10 +11,10 @@ pub fn deg2rad(deg: f64) -> f64 {
 
 #[inline(always)]
 pub fn rand_norm() -> f64 {
-    return rand::thread_rng().gen();
+    return f64::min(rand::thread_rng().gen(), 0.999999999);
 }
 
 #[inline(always)]
 pub fn rand_from(min: f64, max: f64) -> f64 {
-    return min + (max - min) * rand_norm();
+    return min + ((max - min) * rand_norm());
 }

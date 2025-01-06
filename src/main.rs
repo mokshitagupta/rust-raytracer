@@ -323,16 +323,89 @@ fn createFOVScene(world: &mut (impl Hittable + List)) {
     ))));
 }
 
+fn createFinalScene(world: &mut (impl Hittable + List)) {
+    let ground_mat = Rc::new(RefCell::new(Lambertian::from(Color3::from(0.8, 0.8, 0.0))));
+    world.add(Rc::new(RefCell::new(Sphere::new(
+        Point3::from(0.0, -1000.0, -0.0),
+        1000.0,
+        ground_mat,
+    ))));
+
+    for a in -11..11 {
+        for b in -11..11 {
+            let center = Vec3::from(
+                a as f64 + 0.9 * rand_norm(),
+                0.2,
+                b as f64 + 0.9 * rand_norm(),
+            );
+            let prob = rand_norm();
+
+            if (center - Point3::from(4.0, 0.2, 0.0)).length() > 0.9 {
+                // let mat;
+                if prob < 0.8 {
+                    let albedo = Vec3::rand_norm();
+                    let lamb_mat = Rc::new(RefCell::new(Lambertian::from(albedo)));
+                    world.add(Rc::new(RefCell::new(Sphere::new(center, 0.2, lamb_mat))));
+                } else if prob < 0.95 {
+                    let metal_mat = Rc::new(RefCell::new(Metal::from(
+                        Vec3::rand_from(0.5, 1.0),
+                        rand_from(0.0, 0.5),
+                    )));
+                    world.add(Rc::new(RefCell::new(Sphere::new(center, 0.2, metal_mat))));
+                } else {
+                    let dia_mat = Rc::new(RefCell::new(Diaelectric::from(1.50)));
+                    world.add(Rc::new(RefCell::new(Sphere::new(center, 0.2, dia_mat))));
+                }
+            }
+
+            let mat1 = Rc::new(RefCell::new(Diaelectric::from(1.50)));
+            world.add(Rc::new(RefCell::new(Sphere::new(
+                Point3::from(0.0, 1.0, 0.0),
+                1.0,
+                mat1,
+            ))));
+
+            let mat2 = Rc::new(RefCell::new(Lambertian::from(Vec3::from(0.4, 0.2, 0.1))));
+            world.add(Rc::new(RefCell::new(Sphere::new(
+                Point3::from(-4.0, 1.0, 0.0),
+                1.0,
+                mat2,
+            ))));
+
+            let mat3 = Rc::new(RefCell::new(Metal::from(Vec3::from(0.7, 0.6, 0.5), 0.0)));
+            world.add(Rc::new(RefCell::new(Sphere::new(
+                Point3::from(4.0, 1.0, 0.0),
+                1.0,
+                mat3,
+            ))));
+        }
+    }
+}
+
 fn generate_img(w: u64) {
     let aspectRatio: f64 = 16.0 / 9.0;
     let mut world = HittableList::new();
-    let fov = 50.0;
-    let lookfrom = Vec3::from(-2.0, 2.0, 1.0);
-    let lookat = Vec3::from(0.0, 0.0, -1.0);
+    let fov = 20.0;
+    let lookfrom = Vec3::from(13.0, 2.0, 3.0);
+    let lookat = Vec3::from(0.0, 0.0, 0.0);
     let vup = Vec3::from(0.0, 1.0, 0.0);
-    create3Scene(&mut world);
+    let defocus_angle = 0.01;
+    let focus_dist = 10.0;
+    // create3Scene(&mut world);
+    createFinalScene(&mut world);
     // createFOVScene(&mut world);
-    let camera = Camera::new(aspectRatio, w, 100, 50, fov, lookfrom, lookat, vup);
+    let camera = Camera::new(
+        aspectRatio,
+        w,
+        100,
+        50,
+        fov,
+        lookfrom,
+        lookat,
+        vup,
+        defocus_angle,
+        focus_dist,
+    );
     camera.render(&mut world);
 }
 

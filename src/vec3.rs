@@ -223,6 +223,15 @@ pub fn rand_outside(norm: Vec3) -> Vec3 {
     }
 }
 
+pub fn rand_circle() -> Vec3 {
+    loop {
+        let p = Vec3::from(rand_from(-1.0, 1.0), rand_from(-1.0, 1.0), 0.0);
+        if p.length_squared() < 1.0 {
+            return p;
+        }
+    }
+}
+
 #[inline(always)]
 pub fn reflect(v: Vec3, n: Vec3) -> Vec3 {
     v - (2.0 * dot(n, v) * n)

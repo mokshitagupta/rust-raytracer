@@ -1,6 +1,6 @@
 use crate::{
-    cmp, cross, deg2rad, rand_norm, rand_outside, rand_unit_vector, unit_vector, write_clr, Color3,
-    HitRecord, Hittable, Interval, Point3, Ray, Vec3, INFINTY,
+    cmp, cross, deg2rad, rand_circle, rand_norm, rand_outside, rand_unit_vector, unit_vector,
+    write_clr, Color3, HitRecord, Hittable, Interval, Point3, Ray, Vec3, INFINTY,
 };
 
 pub struct Camera {
@@ -18,6 +18,10 @@ pub struct Camera {
     w_a: Vec3,
     u_a: Vec3,
     v_a: Vec3,
+    defocus_angle: f64,
+    focus_dist: f64,
+    defocusRadiusU: Vec3,
+    defocusRadiusV: Vec3,
 }
 
 impl Camera {
@@ -43,8 +47,19 @@ impl Camera {
         let pixelCenter = self.pixel00
             + ((j as f64 + offset.x()) * self.pixelDeltau)
             + ((i as f64 + offset.y()) * self.pixelDeltav);
-        let rayDir = pixelCenter - self.center;
+
+        let mut org = self.center;
+        if self.defocus_angle > 0.0 {
+            org = self.defocus_lens_sample();
+        }
+        let rayDir = pixelCenter - org;
         return Ray::from(self.center, rayDir);
+    }
+
+    fn defocus_lens_sample(&self) -> Vec3 {
+        let p = rand_circle();
+        // eprintln!("{:?} {:?}", self.defocusRadiusU, self.defocusRadiusV);
+        self.center + (p.x() * self.defocusRadiusU) + (p.y() * self.defocusRadiusV)
     }
 
     pub fn new(
@@ -56,24 +71,33 @@ impl Camera {
         lookfrom: Point3,
         lookat: Point3,
         vup: Vec3,
+        defocus_angle: f64,
+        focus_dist: f64,
     ) -> Camera {
         let h = cmp::max((w as f64 / aspect_ratio) as u64, 1);
 
         let camCenter: Point3 = lookfrom;
-        let focalLength = (lookfrom - lookat).length();
+        // let focalLength = (lookfrom - lookat).length();
         let w_a = unit_vector(lookfrom - lookat);
         let u_a = unit_vector(cross(vup, w_a));
         let v_a = cross(w_a, u_a);
-        let fov_angle = f64::tan(deg2rad(fov / 2.0));
-        let vpHeight = 2.0 * focalLength * fov_angle;
+        let fov_angle = f64::tan(deg2rad(fov) / 2.0);
+        let vpHeight = 2.0 * focus_dist * fov_angle;
         let vpWidth = vpHeight * (w as f64 / h as f64);
         let vpu = vpWidth * u_a;
         let vpv = vpHeight * (-v_a);
 
         let pixelDeltau = vpu / (w as f64);
         let pixelDeltav = vpv / (h as f64);
-        let vpUpperLeft = camCenter - (focalLength * w_a) - (vpu / 2.0) - (vpv / 2.0);
+        let vpUpperLeft = camCenter - (focus_dist * w_a) - (vpu / 2.0) - (vpv / 2.0);
         let pixel00 = vpUpperLeft + 0.5 * (pixelDeltau + pixelDeltav);
+
+        let defocus_radius = focus_dist * f64::tan(deg2rad(defocus_angle / 2.0));
+        let defocusRadiusU = u_a * defocus_radius;
+        let defocusRadiusV = v_a * defocus_radius;
+
+        eprintln!("{camCenter:?} {defocusRadiusU:?} {defocusRadiusV:?} {focus_dist:?}");
+
         Camera {
             aspect_ratio,
             w,
@@ -89,6 +113,10 @@ impl Camera {
             w_a,
             u_a,
             v_a,
+            defocus_angle,
+            focus_dist,
+            defocusRadiusU,
+            defocusRadiusV,
         }
     }
 
