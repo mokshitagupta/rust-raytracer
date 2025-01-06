@@ -58,6 +58,12 @@ impl Vec3 {
             rand_from(min, max),
         )
     }
+
+    pub fn set(&mut self, x: f64, y: f64, z: f64) {
+        self.e[0] = x;
+        self.e[1] = y;
+        self.e[2] = z;
+    }
 }
 
 impl ops::Add<Vec3> for Vec3 {
@@ -220,4 +226,12 @@ pub fn rand_outside(norm: Vec3) -> Vec3 {
 #[inline(always)]
 pub fn reflect(v: Vec3, n: Vec3) -> Vec3 {
     v - (2.0 * dot(n, v) * n)
+}
+
+#[inline(always)]
+pub fn refract(effective_index: f64, r: Vec3, n: Vec3) -> Vec3 {
+    let cos_theta = dot(-r, n).min(1.0);
+    let rx = effective_index * (r + (cos_theta * n));
+    let ry = n * -(((1.0 - rx.length_squared()).abs()).sqrt());
+    rx + ry
 }

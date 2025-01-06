@@ -1,6 +1,4 @@
 use core::f64;
-// use std::borrow::Borrow;
-// use std::borrow::BorrowMut;
 use std::cell::RefCell;
 use std::cmp;
 use std::rc::Rc;
@@ -78,6 +76,39 @@ pub struct Lambertian {
 #[derive(Debug)]
 pub struct Metal {
     albedo: Color3,
+    fuzz: f64,
+}
+
+#[derive(Debug)]
+pub struct Diaelectric {
+    refractive_index: f64,
+}
+
+impl Material for Diaelectric {
+    fn scatter(
+        &mut self,
+        r_in: Ray,
+        rec: &mut HitRecord,
+        attenuation: &mut Color3,
+        scattered: &mut Ray,
+    ) -> bool {
+        let mut rind = self.refractive_index;
+        if rec.front_face {
+            rind = 1.0 / self.refractive_index;
+        }
+        let refracted = refract(rind, unit_vector(r_in.direction()), rec.normal);
+        scattered.set(rec.p, refracted);
+        attenuation.set(1.0, 1.0, 1.0);
+        true
+    }
+}
+
+impl Diaelectric {
+    pub fn from(ind: f64) -> impl Material {
+        Diaelectric {
+            refractive_index: ind,
+        }
+    }
 }
 
 impl Material for Lambertian {
@@ -107,16 +138,20 @@ impl Material for Metal {
         attenuation: &mut Color3,
         scattered: &mut Ray,
     ) -> bool {
-        let reflected = reflect(r_in.direction(), rec.normal);
+        let mut reflected = reflect(r_in.direction(), rec.normal);
+        reflected = unit_vector(reflected) + (self.fuzz * rand_unit_vector());
         scattered.set(rec.p, reflected);
         attenuation.copy(self.albedo);
-        true
+        dot(reflected, rec.normal) > 0.0
     }
 }
 
 impl Metal {
-    fn from(albedo: Color3) -> impl Material {
-        Metal { albedo }
+    fn from(albedo: Color3, fuzz: f64) -> impl Material {
+        Metal {
+            albedo,
+            fuzz: fuzz.min(1.0),
+        }
     }
 }
 
@@ -225,8 +260,9 @@ fn generate_img(w: u64) {
 
     let ground_mat = Rc::new(RefCell::new(Lambertian::from(Color3::from(0.8, 0.8, 0.0))));
     let center_mat = Rc::new(RefCell::new(Lambertian::from(Color3::from(0.1, 0.2, 0.5))));
-    let left_mat = Rc::new(RefCell::new(Metal::from(Color3::from(0.8, 0.8, 0.8))));
-    let right_mat = Rc::new(RefCell::new(Metal::from(Color3::from(0.8, 0.6, 0.2))));
+    // let left_mat = Rc::new(RefCell::new(Metal::from(Color3::from(0.8, 0.8, 0.8), 0.3)));
+    let left_mat = Rc::new(RefCell::new(Diaelectric::from(1.50)));
+    let right_mat = Rc::new(RefCell::new(Metal::from(Color3::from(0.8, 0.6, 0.2), 1.0)));
     // eprintln!("{:?}", *ground_mat.borrow());
 
     world.add(Rc::new(RefCell::new(Sphere::new(
